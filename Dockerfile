@@ -23,15 +23,16 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON=python3.11 \
     UV_PROJECT_ENVIRONMENT=/app
 
-# First stage: Install dependencies only (cached until lockfile changes)
-RUN --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project
+# Copy dependency files
+COPY uv.lock pyproject.toml ./
+
+# Install dependencies
+RUN uv sync --frozen --no-install-project
 
 # Copy application code
 COPY . .
 
-# Second stage: Sync the project
+# Install the project
 RUN uv sync --frozen
 
 # Create non-root user for security
