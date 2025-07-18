@@ -11,7 +11,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
+    pkg-config \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust for building packages like jiter
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:$PATH"
 
 # Copy uv binary from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
