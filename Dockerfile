@@ -1,14 +1,8 @@
-# Minimal UV Dockerfile with system Python installation
-FROM python:3.11-slim-bookworm
+# Simplified UV Dockerfile with full Python image (includes build tools)
+FROM python:3.11-bookworm
 
 # Allow statements and log messages to immediately appear in Cloud Run logs
 ENV PYTHONUNBUFFERED=1
-
-# Install minimal build dependencies (gcc/g++ for httptools/grpcio compilation)
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy uv binary from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -22,7 +16,7 @@ WORKDIR /app
 # Copy dependency files first for better Docker layer caching
 COPY uv.lock pyproject.toml ./
 
-# Install dependencies directly to system Python
+# Install dependencies directly to system Python using UV
 RUN uv sync --locked --no-dev
 
 # Copy application code
