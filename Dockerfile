@@ -1,36 +1,37 @@
-# Use the official Python slim image
-FROM python:3.11-slim
+# Multi-stage build for UV with compiled dependencies
+# Builder stage - includes all build dependencies
+FROM python:3.11-slim-bookworm AS builder
 
-# Allow statements and log messages to immediately appear in Cloud Run logs
-ENV PYTHONUNBUFFERED=1
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
+# Install build dependencies for grpcio and other compiled packages
 RUN apt-get update && apt-get install -y \
+    build-essential \
     gcc \
-    curl \
+    g++ \
+    python3-dev \
     pkg-config \
     libssl-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust for building packages like jiter
+# Install Rust for building packages like jiter (OpenAI dependency)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:$PATH"
 
 # Copy uv binary from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Configure uv environment variables
-ENV UV_LINK_MODE=copy \
-    UV_COMPILE_BYTECODE=1 \
+# Configure uv environment variables for optimal builds
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
 
-# Copy dependency files first for better caching
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files first for better Docker layer caching
 COPY uv.lock pyproject.toml ./
 
-# Install dependencies without installing the project
+# Install dependencies (no project install yet)
 RUN uv sync --locked --no-install-project
 
 # Copy application code
@@ -38,6 +39,18 @@ COPY . .
 
 # Install the project
 RUN uv sync --locked
+
+# Runtime stage - minimal image with only runtime dependencies
+FROM python:3.11-slim-bookworm
+
+# Allow statements and log messages to immediately appear in Cloud Run logs
+ENV PYTHONUNBUFFERED=1
+
+# Copy the entire app directory with virtual environment from builder
+COPY --from=builder /app /app
+
+# Set working directory
+WORKDIR /app
 
 # Set PATH to use the virtual environment
 ENV PATH="/app/.venv/bin:$PATH"
