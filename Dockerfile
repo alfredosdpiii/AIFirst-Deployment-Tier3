@@ -19,21 +19,22 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Configure uv environment variables
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
-    UV_PYTHON_DOWNLOADS=never \
-    UV_PYTHON=python3.11 \
-    UV_PROJECT_ENVIRONMENT=/app
+    UV_PYTHON_DOWNLOADS=never
 
-# Copy dependency files
+# Copy dependency files first for better caching
 COPY uv.lock pyproject.toml ./
 
-# Install dependencies
-RUN uv sync --frozen --no-install-project
+# Install dependencies without installing the project
+RUN uv sync --locked --no-install-project
 
 # Copy application code
 COPY . .
 
 # Install the project
-RUN uv sync --frozen
+RUN uv sync --locked
+
+# Set PATH to use the virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -43,5 +44,5 @@ USER appuser
 # Default to 8080 for local testing
 ENV PORT=8080
 
-# Run the application
-CMD exec uv run uvicorn main:app --host 0.0.0.0 --port $PORT
+# Run the application using the virtual environment
+CMD exec uvicorn main:app --host 0.0.0.0 --port $PORT
